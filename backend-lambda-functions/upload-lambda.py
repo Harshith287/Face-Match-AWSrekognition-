@@ -65,7 +65,6 @@ def is_valid_image(bucket, key):
         return False
 
 
-def match_images(bucket_key):
     images = s3.list_objects_v2(Bucket=BUCKET)
     print("all_objects", images)
 
