@@ -91,6 +91,7 @@ const App = () => {
 
     const { url, fields, key } = await resp.json();
     setStatus("Uploading selfie to S3...");
+    console.log(url, fields, key);
 
     // Step 2: Upload to S3
     const formData = new FormData();
@@ -141,6 +142,7 @@ const App = () => {
 const downloadImage = async (url, filename,e) => {
   try {
     // e.stopPropagation();
+    console.log('downloadBlobUrl url', url);
 
     const res = await fetch(url, {
       method: "GET",
@@ -167,33 +169,82 @@ const downloadImage = async (url, filename,e) => {
     // Optionally show user message or fallback to opening url
   }
 };
+// const toggleSelect = (i) => {
+//   setSelected(prev => ({ ...prev, [i]: !prev[i] }));
+// };
 const toggleSelect = (i) => {
-  setSelected(prev => ({ ...prev, [i]: !prev[i] }));
+  setSelected(prev => {
+    const updated = { ...prev, [i]: !prev[i] };
+
+    const allChecked = matches.length > 0 &&
+      matches.every((_, idx) => updated[idx]);
+
+    updated.all = allChecked;
+    return updated;
+  });
 };
 
+
+// const downloadAllSelected = async () => {
+//   const zip = new JSZip();
+//   const folder = zip.folder("matched_images");
+
+//   const selectedIndices = Object.keys(selected).filter(i => selected[i]);
+
+//   if (selectedIndices.length === 0) return;
+
+//   for (const i of selectedIndices) {
+//     const m = matches[i];
+//     const encodedPath = encodeURIComponent(m.image).replace(/%2F/g, "/");
+//     const url = m.imageUrl;
+
+//     const response = await fetch(url, { cache: "no-cache" });
+//     const blob = await response.blob();
+
+//     // Add to folder
+//     folder.file(`match_${i}.jpeg`, blob);
+//   }
+
+//   // Generate the zip & download
+//   zip.generateAsync({ type: "blob" }).then((zipFile) => {
+//     saveAs(zipFile, "selected_images.zip");
+//   });
+// };
 const downloadAllSelected = async () => {
   const zip = new JSZip();
   const folder = zip.folder("matched_images");
 
-  const selectedIndices = Object.keys(selected).filter(i => selected[i]);
+  const selectedIndices = Object.keys(selected)
+    .filter(k => k !== "all" && selected[k])
+    .map(k => Number(k));
 
   if (selectedIndices.length === 0) return;
 
   for (const i of selectedIndices) {
     const m = matches[i];
-    const encodedPath = encodeURIComponent(m.image).replace(/%2F/g, "/");
-    const url = m.imageUrl;
-
-    const response = await fetch(url, { cache: "no-cache" });
+    const response = await fetch(m.imageUrl, { cache: "no-cache" });
     const blob = await response.blob();
-
-    // Add to folder
     folder.file(`match_${i}.jpeg`, blob);
   }
 
-  // Generate the zip & download
-  zip.generateAsync({ type: "blob" }).then((zipFile) => {
-    saveAs(zipFile, "selected_images.zip");
+  const zipFile = await zip.generateAsync({ type: "blob" });
+  saveAs(zipFile, "selected_images.zip");
+};
+
+const toggleSelectAll = () => {
+  setSelected(prev => {
+    const allSelected = !prev.all;
+    const newSelected = { all: allSelected };
+
+    if (allSelected) {
+      matches.forEach((_, idx) => {
+        newSelected[idx] = true;
+      });
+    } else {
+      // All unchecked – only "all" is false, no individual selections
+    }
+
+    return newSelected;
   });
 };
 
@@ -286,13 +337,24 @@ return (
         {err && <p className="text-danger fw-semibold">Error: {err}</p>}
 
         {/* No Matches */}
-        {matches.length === 0 && picUpdated && !err && (
+        {/* {matches.length === 0 && picUpdated && !err && (
           <p className="mt-4 fw-medium">No matches found.</p>
-        )}
+        )} */}
 
         {/* Matches */}
         {matches.length > 0 && (
           <div className="mt-4 w-100">
+                     <div className="mb-2">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={!!selected.all}
+                          onChange={toggleSelectAll}
+                          onClick={e => e.stopPropagation()}
+                        />
+                        <label className="ms-2">Select All</label>
+                      </div>
+
             <h3 className="fw-bold mb-3 text-center">Matched Images</h3>
 
             {/* Download All Button */}
@@ -318,7 +380,7 @@ return (
                       }`}
                       style={{ cursor: "pointer" }}
                     >
-                      <input
+                      <input    
                         type="checkbox"
                         className="form-check-input mb-2"
                         checked={!!selected[i]}
@@ -337,9 +399,9 @@ return (
                       }}
                     />
 
-                      <p className="mb-2">
+                      {/* <p className="mb-2">
                         <strong>Similarity:</strong> {m.similarity.toFixed(2)}%
-                      </p>
+                      </p> */}
 
                       <button
                         className="btn btn-primary w-100"
